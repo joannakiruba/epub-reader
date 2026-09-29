@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   BookOpen, Upload, Play, Eye, EyeOff, Bookmark, Trash2,
   Type, Palette, SlidersHorizontal, Sun, Moon, Keyboard,
+  ChevronRight, Sparkles, CircleDot,
 } from 'lucide-react';
 import './App.css';
 
@@ -24,18 +25,11 @@ export default function App() {
   useEffect(() => {
     if (!api) return;
 
-    api.onProgressUpdate((data) => {
-      setProgress(data.progress);
-    });
-
-    api.onLocationChanged((data) => {
-      setCurrentBook((prev) => (prev ? { ...prev, lastReadCfi: data.cfi } : prev));
-    });
-
-    api.getStyle().then((s) => {
-      if (s) setStyle(s);
-    });
-
+    api.onProgressUpdate((data) => setProgress(data.progress));
+    api.onLocationChanged((data) =>
+      setCurrentBook((prev) => (prev ? { ...prev, lastReadCfi: data.cfi } : prev))
+    );
+    api.getStyle().then((s) => { if (s) setStyle(s); });
     api.getCurrentBook().then((book) => {
       if (book) {
         setCurrentBook(book);
@@ -43,10 +37,7 @@ export default function App() {
         loadBookmarks(book.filePath);
       }
     });
-
-    api.storeGet('mainTheme').then((t) => {
-      if (t) setTheme(t);
-    });
+    api.storeGet('mainTheme').then((t) => { if (t) setTheme(t); });
 
     return () => {
       api.removeAllListeners('progress-update');
@@ -61,6 +52,7 @@ export default function App() {
   };
 
   const handleOpenEpub = async () => {
+    if (!api) return;
     const result = await api.openEpub();
     if (result) {
       setCurrentBook(result);
@@ -70,12 +62,13 @@ export default function App() {
   };
 
   const handleContinueReading = async () => {
-    if (!currentBook) return;
+    if (!currentBook || !api) return;
     await api.loadEpub(currentBook.filePath);
     api.showWidget();
   };
 
   const loadBookmarks = async (bookId) => {
+    if (!api) return;
     const bm = await api.getBookmarks(bookId);
     setBookmarks(bm);
   };
@@ -83,110 +76,120 @@ export default function App() {
   const handleStyleChange = (key, value) => {
     const newStyle = { ...style, [key]: value };
     setStyle(newStyle);
-    api.updateStyle(newStyle);
-    api.storeSet('style', newStyle);
+    api?.updateStyle(newStyle);
+    api?.storeSet('style', newStyle);
   };
 
-  const handleShowWidget = () => api.showWidget();
-  const handleHideWidget = () => api.hideWidget();
-
   const handleGotoBookmark = (cfi) => {
-    api.gotoBookmark(cfi);
-    api.showWidget();
+    api?.gotoBookmark(cfi);
+    api?.showWidget();
   };
 
   const handleRemoveBookmark = async (id) => {
+    if (!api) return;
     const updated = await api.removeBookmark(id);
     setBookmarks(updated);
   };
 
   return (
-    <div className={`app ${theme}`}>
-      <div className="app-inner">
-        <header className="header">
-          <div className="header-left">
-            <div className="logo">
-              <BookOpen size={28} strokeWidth={1.5} />
+    <div className={`app theme-${theme}`} data-theme={theme}>
+      <div className="bg-noise" />
+
+      <div className="app-shell">
+        {/* ── Header ── */}
+        <header className="topbar">
+          <div className="topbar-brand">
+            <div className="brand-icon">
+              <BookOpen size={22} strokeWidth={1.5} />
             </div>
-            <div>
+            <div className="brand-text">
               <h1>Epub Reader</h1>
-              <p className="subtitle">Your floating reading companion</p>
+              <span className="brand-sub">floating reading companion</span>
             </div>
           </div>
-          <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          <button className="icon-btn theme-btn" onClick={toggleTheme} title="Toggle theme">
+            {theme === 'dark' ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
           </button>
         </header>
 
-        <section className="card">
-          <div className="card-header">
-            <BookOpen size={18} strokeWidth={1.5} />
+        {/* ── Library ── */}
+        <section className="glass-card">
+          <div className="card-head">
+            <div className="card-head-icon"><Sparkles size={16} strokeWidth={1.5} /></div>
             <h2>Library</h2>
           </div>
 
-          <button className="btn btn-primary" onClick={handleOpenEpub}>
-            <Upload size={16} />
-            Open Epub File
+          <button className="action-btn" onClick={handleOpenEpub}>
+            <Upload size={18} strokeWidth={1.5} />
+            <span>Open Epub File</span>
+            <ChevronRight size={16} className="action-arrow" />
           </button>
 
           {currentBook && (
-            <div className="book-card">
-              <div className="book-info">
-                <BookOpen size={20} className="book-icon" />
-                <div className="book-details">
+            <div className="book-tile">
+              <div className="book-tile-top">
+                <div className="book-tile-icon">
+                  <BookOpen size={24} strokeWidth={1.2} />
+                </div>
+                <div className="book-tile-info">
                   <h3>{currentBook.fileName}</h3>
-                  <div className="progress-row">
-                    <div className="progress-track">
-                      <div className="progress-fill" style={{ width: `${progress * 100}%` }} />
+                  <div className="prog-row">
+                    <div className="prog-track">
+                      <div className="prog-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
+                      <div className="prog-glow" style={{ left: `${Math.round(progress * 100)}%` }} />
                     </div>
-                    <span className="progress-label">{Math.round(progress * 100)}%</span>
+                    <span className="prog-pct">{Math.round(progress * 100)}%</span>
                   </div>
                 </div>
               </div>
-              <div className="book-actions">
-                <button className="btn btn-accent" onClick={handleContinueReading}>
-                  <Play size={14} />
-                  Continue Reading
+              <div className="book-tile-actions">
+                <button className="pill-btn pill-primary" onClick={handleContinueReading}>
+                  <Play size={14} strokeWidth={2} />
+                  <span>Continue</span>
                 </button>
-                <button className="btn btn-ghost" onClick={handleShowWidget} title="Show Widget">
-                  <Eye size={14} />
+                <button className="icon-btn" onClick={() => api?.showWidget()} title="Show widget">
+                  <Eye size={16} strokeWidth={1.5} />
                 </button>
-                <button className="btn btn-ghost" onClick={handleHideWidget} title="Hide Widget">
-                  <EyeOff size={14} />
+                <button className="icon-btn" onClick={() => api?.hideWidget()} title="Hide widget">
+                  <EyeOff size={16} strokeWidth={1.5} />
                 </button>
               </div>
             </div>
           )}
         </section>
 
-        <section className="card">
-          <div className="card-header">
-            <Bookmark size={18} strokeWidth={1.5} />
+        {/* ── Bookmarks ── */}
+        <section className="glass-card">
+          <div className="card-head">
+            <div className="card-head-icon"><Bookmark size={16} strokeWidth={1.5} /></div>
             <h2>Bookmarks</h2>
+            {bookmarks.length > 0 && <span className="badge">{bookmarks.length}</span>}
           </div>
 
           {bookmarks.length === 0 ? (
-            <div className="empty-state">
-              <Bookmark size={32} strokeWidth={1} />
+            <div className="empty">
+              <div className="empty-icon">
+                <Bookmark size={36} strokeWidth={1} />
+              </div>
               <p>No bookmarks yet</p>
-              <span>Press Ctrl+B while reading to add one</span>
+              <span className="empty-hint">Press <kbd>Ctrl+B</kbd> while reading</span>
             </div>
           ) : (
-            <ul className="bookmark-list">
+            <ul className="bm-list">
               {bookmarks.map((bm) => (
-                <li key={bm.id} className="bookmark-item" onClick={() => handleGotoBookmark(bm.cfi)}>
-                  <div className="bookmark-marker" />
-                  <div className="bookmark-body">
-                    <p className="bookmark-snippet">{bm.snippet}</p>
-                    {bm.note && <p className="bookmark-note">{bm.note}</p>}
-                    <span className="bookmark-date">{new Date(bm.createdAt).toLocaleDateString()}</span>
+                <li key={bm.id} className="bm-row" onClick={() => handleGotoBookmark(bm.cfi)}>
+                  <div className="bm-pip" />
+                  <div className="bm-body">
+                    <p className="bm-text">{bm.snippet}</p>
+                    {bm.note && <p className="bm-note">{bm.note}</p>}
+                    <span className="bm-date">{new Date(bm.createdAt).toLocaleDateString()}</span>
                   </div>
                   <button
-                    className="btn-icon btn-icon-danger"
+                    className="icon-btn icon-btn-danger"
                     onClick={(e) => { e.stopPropagation(); handleRemoveBookmark(bm.id); }}
-                    title="Remove bookmark"
+                    title="Remove"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={14} strokeWidth={1.5} />
                   </button>
                 </li>
               ))}
@@ -194,53 +197,36 @@ export default function App() {
           )}
         </section>
 
-        <section className="card">
-          <div className="card-header">
-            <SlidersHorizontal size={18} strokeWidth={1.5} />
+        {/* ── Customize ── */}
+        <section className="glass-card">
+          <div className="card-head">
+            <div className="card-head-icon"><SlidersHorizontal size={16} strokeWidth={1.5} /></div>
             <h2>Customize Widget</h2>
           </div>
 
-          <div className="settings-grid">
-            <div className="setting-item">
-              <div className="setting-label">
-                <Palette size={14} />
-                <span>Background Color</span>
+          <div className="opts">
+            <label className="opt-row">
+              <span className="opt-label"><Palette size={14} strokeWidth={1.5} /> Background</span>
+              <div className="color-wrap">
+                <input type="color" value={style.backgroundColor}
+                  onChange={(e) => handleStyleChange('backgroundColor', e.target.value)} />
+                <code>{style.backgroundColor}</code>
               </div>
-              <div className="color-picker-wrap">
-                <input
-                  type="color"
-                  value={style.backgroundColor}
-                  onChange={(e) => handleStyleChange('backgroundColor', e.target.value)}
-                />
-                <span className="color-value">{style.backgroundColor}</span>
-              </div>
-            </div>
+            </label>
 
-            <div className="setting-item">
-              <div className="setting-label">
-                <Type size={14} />
-                <span>Font Color</span>
+            <label className="opt-row">
+              <span className="opt-label"><Type size={14} strokeWidth={1.5} /> Font Color</span>
+              <div className="color-wrap">
+                <input type="color" value={style.fontColor}
+                  onChange={(e) => handleStyleChange('fontColor', e.target.value)} />
+                <code>{style.fontColor}</code>
               </div>
-              <div className="color-picker-wrap">
-                <input
-                  type="color"
-                  value={style.fontColor}
-                  onChange={(e) => handleStyleChange('fontColor', e.target.value)}
-                />
-                <span className="color-value">{style.fontColor}</span>
-              </div>
-            </div>
+            </label>
 
-            <div className="setting-item">
-              <div className="setting-label">
-                <Type size={14} />
-                <span>Font Family</span>
-              </div>
-              <select
-                className="select"
-                value={style.fontFamily}
-                onChange={(e) => handleStyleChange('fontFamily', e.target.value)}
-              >
+            <label className="opt-row">
+              <span className="opt-label"><Type size={14} strokeWidth={1.5} /> Font</span>
+              <select className="sel" value={style.fontFamily}
+                onChange={(e) => handleStyleChange('fontFamily', e.target.value)}>
                 <option value="Georgia, serif">Georgia</option>
                 <option value="'Times New Roman', serif">Times New Roman</option>
                 <option value="Arial, sans-serif">Arial</option>
@@ -249,71 +235,43 @@ export default function App() {
                 <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
                 <option value="Palatino, serif">Palatino</option>
               </select>
-            </div>
+            </label>
 
-            <div className="setting-item">
-              <div className="setting-label">
-                <Type size={14} />
-                <span>Font Size</span>
-                <span className="setting-value">{style.fontSize}px</span>
-              </div>
-              <input
-                type="range"
-                className="range"
-                min="10"
-                max="32"
+            <label className="opt-row">
+              <span className="opt-label"><CircleDot size={14} strokeWidth={1.5} /> Size <em>{style.fontSize}px</em></span>
+              <input type="range" className="slider" min="10" max="32"
                 value={style.fontSize}
-                onChange={(e) => handleStyleChange('fontSize', parseInt(e.target.value))}
-              />
-            </div>
+                onChange={(e) => handleStyleChange('fontSize', parseInt(e.target.value))} />
+            </label>
 
-            <div className="setting-item">
-              <div className="setting-label">
-                <SlidersHorizontal size={14} />
-                <span>Opacity</span>
-                <span className="setting-value">{Math.round(style.opacity * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                className="range"
-                min="30"
-                max="100"
+            <label className="opt-row">
+              <span className="opt-label"><SlidersHorizontal size={14} strokeWidth={1.5} /> Opacity <em>{Math.round(style.opacity * 100)}%</em></span>
+              <input type="range" className="slider" min="30" max="100"
                 value={style.opacity * 100}
-                onChange={(e) => handleStyleChange('opacity', parseInt(e.target.value) / 100)}
-              />
-            </div>
+                onChange={(e) => handleStyleChange('opacity', parseInt(e.target.value) / 100)} />
+            </label>
 
-            <div className="setting-item">
-              <div className="setting-label">
-                <Palette size={14} />
-                <span>Texture Overlay</span>
-              </div>
-              <select
-                className="select"
-                value={style.backgroundTexture || 'none'}
+            <label className="opt-row">
+              <span className="opt-label"><Palette size={14} strokeWidth={1.5} /> Texture</span>
+              <select className="sel" value={style.backgroundTexture || 'none'}
                 onChange={(e) =>
                   handleStyleChange('backgroundTexture', e.target.value === 'none' ? null : e.target.value)
-                }
-              >
+                }>
                 <option value="none">None</option>
                 <option value="parchment">Parchment</option>
                 <option value="paper">Paper</option>
                 <option value="linen">Linen</option>
                 <option value="dark-wood">Dark Wood</option>
               </select>
-            </div>
+            </label>
           </div>
         </section>
 
-        <footer className="footer">
-          <div className="shortcut">
-            <Keyboard size={12} />
-            <span>Ctrl+Shift+R toggle widget</span>
-          </div>
-          <div className="shortcut">
-            <Bookmark size={12} />
-            <span>Ctrl+B quick bookmark</span>
-          </div>
+        {/* ── Footer ── */}
+        <footer className="foot">
+          <kbd>Ctrl+Shift+R</kbd> <span>toggle widget</span>
+          <span className="foot-sep" />
+          <kbd>Ctrl+B</kbd> <span>bookmark</span>
         </footer>
       </div>
     </div>

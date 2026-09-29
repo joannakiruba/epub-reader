@@ -86,11 +86,8 @@ export default function App() {
         const styleEl = doc.createElement('style');
         styleEl.textContent = `
           html, body { overflow-x: hidden !important; }
-          ::-webkit-scrollbar { width: 3px; }
-          ::-webkit-scrollbar:horizontal { height: 0; display: none; }
-          ::-webkit-scrollbar-track { background: transparent; }
-          ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.25); border-radius: 2px; }
-          ::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.45); }
+          ::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
+          * { -ms-overflow-style: none !important; scrollbar-width: none !important; }
         `;
         doc.head.appendChild(styleEl);
       });

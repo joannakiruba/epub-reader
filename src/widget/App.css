@@ -9,6 +9,13 @@ body {
   background: transparent;
 }
 
+/* Hide all scrollbars globally */
+::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
 .widget {
   width: 100vw;
   height: 100vh;
@@ -69,31 +76,11 @@ body {
 
 .reader-container {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: scroll;
   overflow-x: hidden;
   padding: 8px;
-}
-
-.reader-container::-webkit-scrollbar {
-  width: 3px;
-}
-
-.reader-container::-webkit-scrollbar:horizontal {
-  height: 0;
-  display: none;
-}
-
-.reader-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.reader-container::-webkit-scrollbar-thumb {
-  background: rgba(128, 128, 128, 0.25);
-  border-radius: 2px;
-}
-
-.reader-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(128, 128, 128, 0.45);
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .reader-container iframe {
@@ -108,5 +95,4 @@ body {
   opacity: 0.4;
   font-size: 13px;
   font-style: italic;
-
 }

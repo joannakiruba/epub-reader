@@ -235,8 +235,8 @@ function setupIPC() {
     }
   });
 
-  // ── Drag: poll cursor AND mouse button in main process ──
-  let dragOffset = null;
+  // ── Drag: poll cursor in main process, lock size with setBounds ──
+  let dragState = null;
   let dragInterval = null;
 
   function stopDrag() {
@@ -244,26 +244,40 @@ function setupIPC() {
       clearInterval(dragInterval);
       dragInterval = null;
     }
-    dragOffset = null;
-    if (widgetWindow) widgetWindow.setResizable(true);
+    if (widgetWindow && dragState) {
+      widgetWindow.setMinimumSize(200, 150);
+      widgetWindow.setMaximumSize(0, 0);
+      widgetWindow.setResizable(true);
+    }
+    dragState = null;
   }
 
   ipcMain.on('widget-start-drag', (_, screenX, screenY) => {
     if (!widgetWindow) return;
     const bounds = widgetWindow.getBounds();
-    dragOffset = { x: screenX - bounds.x, y: screenY - bounds.y };
+    dragState = {
+      offsetX: screenX - bounds.x,
+      offsetY: screenY - bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+    };
     widgetWindow.setResizable(false);
+    widgetWindow.setMinimumSize(bounds.width, bounds.height);
+    widgetWindow.setMaximumSize(bounds.width, bounds.height);
 
     if (dragInterval) clearInterval(dragInterval);
     dragInterval = setInterval(() => {
-      if (!widgetWindow || !dragOffset) {
+      if (!widgetWindow || !dragState) {
         stopDrag();
         return;
       }
       const cursor = screen.getCursorScreenPoint();
-      const newX = Math.round(cursor.x - dragOffset.x);
-      const newY = Math.round(cursor.y - dragOffset.y);
-      widgetWindow.setPosition(newX, newY);
+      widgetWindow.setBounds({
+        x: Math.round(cursor.x - dragState.offsetX),
+        y: Math.round(cursor.y - dragState.offsetY),
+        width: dragState.width,
+        height: dragState.height,
+      });
     }, 16);
   });
 

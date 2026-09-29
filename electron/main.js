@@ -142,6 +142,26 @@ function setupIPC() {
     }
   });
 
+  let dragOffset = null;
+
+  ipcMain.on('widget-start-drag', (_, screenX, screenY) => {
+    if (!widgetWindow) return;
+    const [winX, winY] = widgetWindow.getPosition();
+    dragOffset = { x: screenX - winX, y: screenY - winY };
+  });
+
+  ipcMain.on('widget-dragging', (_, screenX, screenY) => {
+    if (!widgetWindow || !dragOffset) return;
+    widgetWindow.setPosition(
+      Math.round(screenX - dragOffset.x),
+      Math.round(screenY - dragOffset.y)
+    );
+  });
+
+  ipcMain.on('widget-stop-drag', () => {
+    dragOffset = null;
+  });
+
   ipcMain.on('widget-show', () => {
     if (widgetWindow) widgetWindow.show();
   });

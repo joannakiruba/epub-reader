@@ -6,6 +6,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCurrentBook: () => ipcRenderer.invoke('get-current-book'),
   saveBookProgress: (data) => ipcRenderer.invoke('save-book-progress', data),
 
+  startDrag: (x, y) => ipcRenderer.send('widget-start-drag', x, y),
+  dragging: (x, y) => ipcRenderer.send('widget-dragging', x, y),
+  stopDrag: () => ipcRenderer.send('widget-stop-drag'),
+
   showWidget: () => ipcRenderer.send('widget-show'),
   hideWidget: () => ipcRenderer.send('widget-hide'),
   toggleWidget: () => ipcRenderer.send('widget-toggle'),

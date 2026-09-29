@@ -1,8 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import ePub from 'epubjs';
 import './App.css';
 
 const api = window.electronAPI;
+
+function hexToLuminance(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const toLinear = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+}
 
 export default function App() {
   const viewerRef = useRef(null);
@@ -19,6 +27,9 @@ export default function App() {
     backgroundTexture: null,
     opacity: 1.0,
   });
+
+  const isDark = useMemo(() => hexToLuminance(style.backgroundColor) < 0.4, [style.backgroundColor]);
+  const controlColor = isDark ? '#ffffff' : '#000000';
 
   const applyStyle = useCallback((rendition, s) => {
     if (!rendition) return;
@@ -190,31 +201,53 @@ export default function App() {
   const handleNext = () => renditionRef.current?.next();
   const handleHide = () => api?.hideWidget();
 
+  const handleDragStart = (e) => {
+    if (e.target.closest('.widget-nav')) return;
+    e.preventDefault();
+    api?.startDrag(e.screenX, e.screenY);
+
+    const onMove = (ev) => {
+      api?.dragging(ev.screenX, ev.screenY);
+    };
+    const onUp = () => {
+      api?.stopDrag();
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
   const textureMap = {
-    parchment: 'linear-gradient(135deg, #f5e6d0 0%, #e8d5b7 50%, #f0dfc4 100%)',
-    paper: 'linear-gradient(180deg, #fefefe 0%, #f5f5f0 50%, #fafaf5 100%)',
-    linen: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)',
-    'dark-wood': 'linear-gradient(135deg, #3e2723 0%, #4e342e 50%, #3e2723 100%)',
+    parchment: 'repeating-linear-gradient(135deg, rgba(139,110,78,0.08) 0px, transparent 2px, transparent 4px, rgba(139,110,78,0.05) 6px)',
+    paper: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.01) 0px, transparent 1px, transparent 3px, rgba(0,0,0,0.02) 4px)',
+    linen: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(128,128,128,0.06) 2px, rgba(128,128,128,0.06) 4px), repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(128,128,128,0.04) 2px, rgba(128,128,128,0.04) 4px)',
+    'dark-wood': 'repeating-linear-gradient(175deg, rgba(60,40,20,0.12) 0px, transparent 3px, transparent 6px, rgba(60,40,20,0.08) 9px)',
   };
 
   const bgStyle = {
     backgroundColor: style.backgroundColor,
     backgroundImage: style.backgroundTexture ? textureMap[style.backgroundTexture] : 'none',
     opacity: style.opacity,
+    color: controlColor,
+  };
+
+  const btnStyle = {
+    color: controlColor,
   };
 
   return (
     <div className="widget" style={bgStyle}>
-      <div className="widget-titlebar">
-        <span className="widget-drag-hint">&#x2807;</span>
+      <div className="widget-titlebar" onMouseDown={handleDragStart}>
+        <span className="widget-drag-hint" style={{ color: controlColor }}>&#x2807;</span>
         <div className="widget-nav">
-          <button onClick={handlePrev} title="Previous">&#x2190;</button>
-          <button onClick={handleNext} title="Next">&#x2192;</button>
-          <button onClick={handleHide} title="Hide (Ctrl+Shift+R)">&#x2715;</button>
+          <button onClick={handlePrev} title="Previous" style={btnStyle}>&#x2190;</button>
+          <button onClick={handleNext} title="Next" style={btnStyle}>&#x2192;</button>
+          <button onClick={handleHide} title="Hide (Ctrl+Shift+R)" style={btnStyle}>&#x2715;</button>
         </div>
       </div>
       {!hasBook && (
-        <div className="empty-widget">
+        <div className="empty-widget" style={{ color: controlColor }}>
           <p>Open an epub from the main window</p>
         </div>
       )}

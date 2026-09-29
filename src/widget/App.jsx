@@ -81,20 +81,43 @@ export default function App() {
       renditionRef.current = rendition;
       applyStyle(rendition, styleRef.current);
 
+      rendition.hooks.content.register((contents) => {
+        const doc = contents.document;
+        const styleEl = doc.createElement('style');
+        styleEl.textContent = `
+          html, body { overflow-x: hidden !important; }
+          ::-webkit-scrollbar { width: 3px; }
+          ::-webkit-scrollbar:horizontal { height: 0; display: none; }
+          ::-webkit-scrollbar-track { background: transparent; }
+          ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.25); border-radius: 2px; }
+          ::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.45); }
+        `;
+        doc.head.appendChild(styleEl);
+      });
+
+      let locationsReady = false;
+
       rendition.on('relocated', (location) => {
         const cfi = location.start.cfi;
         currentCfiRef.current = cfi;
 
-        const progress = location.start.percentage || 0;
-
         if (api) {
           api.sendLocationChanged({ cfi });
-          api.sendProgressUpdate({ progress });
-          api.saveBookProgress({
-            filePath: currentBookIdRef.current,
-            cfi,
-            progress,
-          });
+          if (locationsReady) {
+            const progress = location.start.percentage || 0;
+            api.sendProgressUpdate({ progress });
+            api.saveBookProgress({
+              filePath: currentBookIdRef.current,
+              cfi,
+              progress,
+            });
+          } else {
+            api.saveBookProgress({
+              filePath: currentBookIdRef.current,
+              cfi,
+              progress: undefined,
+            });
+          }
         }
       });
 
@@ -102,6 +125,11 @@ export default function App() {
       const resumeCfi = savedBook?.filePath === currentBookIdRef.current
         ? savedBook.lastReadCfi
         : null;
+      const savedProgress = savedBook?.progress || 0;
+
+      if (api) {
+        api.sendProgressUpdate({ progress: savedProgress });
+      }
 
       if (resumeCfi) {
         await rendition.display(resumeCfi);
@@ -112,10 +140,17 @@ export default function App() {
       setHasBook(true);
 
       book.locations.generate(1024).then(() => {
+        locationsReady = true;
         if (renditionRef.current) {
           const loc = renditionRef.current.currentLocation();
           if (loc && loc.start) {
-            api?.sendProgressUpdate({ progress: loc.start.percentage || 0 });
+            const progress = loc.start.percentage || 0;
+            api?.sendProgressUpdate({ progress });
+            api?.saveBookProgress({
+              filePath: currentBookIdRef.current,
+              cfi: loc.start.cfi,
+              progress,
+            });
           }
         }
       });

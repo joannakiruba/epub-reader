@@ -228,7 +228,9 @@ function setupIPC() {
     const idx = books.findIndex((b) => b.filePath === filePath);
     if (idx !== -1) {
       books[idx].lastReadCfi = cfi;
-      books[idx].progress = progress;
+      if (progress !== undefined && progress !== null) {
+        books[idx].progress = progress;
+      }
       saveBooks(books);
     }
   });

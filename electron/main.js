@@ -6,6 +6,7 @@ const { setupTray } = require('./tray');
 let mainWindow = null;
 let widgetWindow = null;
 let tray = null;
+let isQuitting = false;
 
 const isDev = !app.isPackaged;
 const preloadPath = path.join(__dirname, 'preload.js');
@@ -28,10 +29,11 @@ function createMainWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-    if (widgetWindow) widgetWindow.close();
-    app.quit();
+  mainWindow.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      mainWindow.hide();
+    }
   });
 }
 
@@ -408,10 +410,14 @@ app.whenReady().then(async () => {
   });
 });
 
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
 });
 
 app.on('window-all-closed', () => {
-  app.quit();
+  // Don't quit — app stays alive in tray
 });

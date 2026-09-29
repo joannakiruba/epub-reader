@@ -24,8 +24,7 @@
       "electron/**/*"
     ],
     "win": {
-      "target": "nsis",
-      "icon": null
+      "target": "nsis"
     },
     "mac": {
       "target": "dmg",

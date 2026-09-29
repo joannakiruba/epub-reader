@@ -104,12 +104,42 @@ function setupIPC() {
     const base64 = fileData.toString('base64');
     const fileName = path.basename(filePath);
 
+    const bookInfo = { fileName, filePath, progress: 0, lastReadCfi: null };
+    store.set('currentBook', bookInfo);
+
     if (widgetWindow) {
       widgetWindow.webContents.send('epub-opened', { base64, fileName, filePath });
       widgetWindow.show();
     }
 
-    return { fileName, filePath };
+    return bookInfo;
+  });
+
+  ipcMain.handle('load-epub', async (_, filePath) => {
+    if (!filePath || !fs.existsSync(filePath)) return null;
+
+    const fileData = fs.readFileSync(filePath);
+    const base64 = fileData.toString('base64');
+    const fileName = path.basename(filePath);
+
+    if (widgetWindow) {
+      widgetWindow.webContents.send('epub-opened', { base64, fileName, filePath });
+    }
+
+    return { base64, fileName, filePath };
+  });
+
+  ipcMain.handle('get-current-book', async () => {
+    return store.get('currentBook', null);
+  });
+
+  ipcMain.handle('save-book-progress', async (_, { filePath, cfi, progress }) => {
+    const current = store.get('currentBook');
+    if (current && current.filePath === filePath) {
+      current.lastReadCfi = cfi;
+      current.progress = progress;
+      store.set('currentBook', current);
+    }
   });
 
   ipcMain.on('widget-show', () => {

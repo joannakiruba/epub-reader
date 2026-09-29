@@ -76,13 +76,21 @@ export default function App() {
         if (api) {
           api.sendLocationChanged({ cfi });
           api.sendProgressUpdate({ progress });
-          api.storeSet('lastReadCfi', cfi);
+          api.saveBookProgress({
+            filePath: currentBookIdRef.current,
+            cfi,
+            progress,
+          });
         }
       });
 
-      const lastCfi = await api?.storeGet('lastReadCfi');
-      if (lastCfi) {
-        await rendition.display(lastCfi);
+      const savedBook = await api?.getCurrentBook();
+      const resumeCfi = savedBook?.filePath === currentBookIdRef.current
+        ? savedBook.lastReadCfi
+        : null;
+
+      if (resumeCfi) {
+        await rendition.display(resumeCfi);
       } else {
         await rendition.display();
       }

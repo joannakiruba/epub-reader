@@ -31,6 +31,14 @@ export default function App() {
       if (s) setStyle(s);
     });
 
+    api.getCurrentBook().then((book) => {
+      if (book) {
+        setCurrentBook(book);
+        setProgress(book.progress || 0);
+        loadBookmarks(book.filePath);
+      }
+    });
+
     return () => {
       api.removeAllListeners('progress-update');
       api.removeAllListeners('location-changed');
@@ -40,9 +48,16 @@ export default function App() {
   const handleOpenEpub = async () => {
     const result = await api.openEpub();
     if (result) {
-      setCurrentBook({ fileName: result.fileName, filePath: result.filePath });
+      setCurrentBook(result);
+      setProgress(result.progress || 0);
       loadBookmarks(result.filePath);
     }
+  };
+
+  const handleContinueReading = async () => {
+    if (!currentBook) return;
+    await api.loadEpub(currentBook.filePath);
+    api.showWidget();
   };
 
   const loadBookmarks = async (bookId) => {
@@ -91,6 +106,7 @@ export default function App() {
             </div>
             <span className="progress-text">{Math.round(progress * 100)}%</span>
             <div className="widget-controls">
+              <button className="btn btn-primary btn-small" onClick={handleContinueReading}>Continue Reading</button>
               <button className="btn btn-small" onClick={handleShowWidget}>Show Widget</button>
               <button className="btn btn-small" onClick={handleHideWidget}>Hide Widget</button>
             </div>

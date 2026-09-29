@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   openEpub: () => ipcRenderer.invoke('open-epub'),
   loadEpub: (filePath) => ipcRenderer.invoke('load-epub', filePath),
+  getCurrentBook: () => ipcRenderer.invoke('get-current-book'),
+  saveBookProgress: (data) => ipcRenderer.invoke('save-book-progress', data),
 
   showWidget: () => ipcRenderer.send('widget-show'),
   hideWidget: () => ipcRenderer.send('widget-hide'),

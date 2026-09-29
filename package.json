@@ -1,0 +1,57 @@
+{
+  "name": "epub-reader",
+  "version": "1.0.0",
+  "description": "Desktop epub reader with floating widget",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev:renderer": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\"",
+    "build": "vite build && electron-builder",
+    "build:win": "vite build && electron-builder --win",
+    "build:mac": "vite build && electron-builder --mac",
+    "build:linux": "vite build && electron-builder --linux"
+  },
+  "keywords": [],
+  "build": {
+    "appId": "com.epub-reader.app",
+    "productName": "Epub Reader",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": null
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.books"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "dependencies": {
+    "electron-store": "^11.0.2",
+    "epubjs": "^0.3.93",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "vite": "^8.3.1",
+    "wait-on": "^9.4.0"
+  }
+}

@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onStyleUpdate: (cb) => ipcRenderer.on('style-update', (_, style) => cb(style)),
   getStyle: () => ipcRenderer.invoke('get-style'),
 
+  onBookmarksUpdated: (cb) => ipcRenderer.on('bookmarks-updated', (_, bookmarks) => cb(bookmarks)),
   onEpubOpened: (cb) => ipcRenderer.on('epub-opened', (_, data) => cb(data)),
 
   storeGet: (key) => ipcRenderer.invoke('store-get', key),

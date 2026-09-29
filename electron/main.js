@@ -235,41 +235,40 @@ function setupIPC() {
     }
   });
 
-  // ── Drag: poll cursor in main process so it never loses track ──
+  // ── Drag: poll cursor AND mouse button in main process ──
   let dragOffset = null;
   let dragInterval = null;
 
-  ipcMain.on('widget-start-drag', (_, screenX, screenY) => {
-    if (!widgetWindow) return;
-    const [winX, winY] = widgetWindow.getPosition();
-    dragOffset = { x: screenX - winX, y: screenY - winY };
-    widgetWindow.setResizable(false);
-
-    if (dragInterval) clearInterval(dragInterval);
-    dragInterval = setInterval(() => {
-      if (!widgetWindow || !dragOffset) {
-        clearInterval(dragInterval);
-        dragInterval = null;
-        return;
-      }
-      const cursor = screen.getCursorScreenPoint();
-      widgetWindow.setPosition(
-        Math.round(cursor.x - dragOffset.x),
-        Math.round(cursor.y - dragOffset.y)
-      );
-    }, 16);
-  });
-
-  ipcMain.on('widget-dragging', () => {});
-
-  ipcMain.on('widget-stop-drag', () => {
+  function stopDrag() {
     if (dragInterval) {
       clearInterval(dragInterval);
       dragInterval = null;
     }
     dragOffset = null;
     if (widgetWindow) widgetWindow.setResizable(true);
+  }
+
+  ipcMain.on('widget-start-drag', (_, screenX, screenY) => {
+    if (!widgetWindow) return;
+    const bounds = widgetWindow.getBounds();
+    dragOffset = { x: screenX - bounds.x, y: screenY - bounds.y };
+    widgetWindow.setResizable(false);
+
+    if (dragInterval) clearInterval(dragInterval);
+    dragInterval = setInterval(() => {
+      if (!widgetWindow || !dragOffset) {
+        stopDrag();
+        return;
+      }
+      const cursor = screen.getCursorScreenPoint();
+      const newX = Math.round(cursor.x - dragOffset.x);
+      const newY = Math.round(cursor.y - dragOffset.y);
+      widgetWindow.setPosition(newX, newY);
+    }, 16);
   });
+
+  ipcMain.on('widget-dragging', () => {});
+  ipcMain.on('widget-stop-drag', stopDrag);
 
   // ── Widget visibility ──
   ipcMain.on('widget-show', () => {
@@ -315,6 +314,9 @@ function setupIPC() {
     const bookmarks = store.get('bookmarks', []);
     bookmarks.push(bookmark);
     store.set('bookmarks', bookmarks);
+    if (mainWindow) {
+      mainWindow.webContents.send('bookmarks-updated', bookmarks);
+    }
     return bookmarks;
   });
 
@@ -322,6 +324,9 @@ function setupIPC() {
     let bookmarks = store.get('bookmarks', []);
     bookmarks = bookmarks.filter((b) => b.id !== id);
     store.set('bookmarks', bookmarks);
+    if (mainWindow) {
+      mainWindow.webContents.send('bookmarks-updated', bookmarks);
+    }
     return bookmarks;
   });
 

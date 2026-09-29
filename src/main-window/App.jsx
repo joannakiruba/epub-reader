@@ -57,12 +57,25 @@ export default function App() {
 
     api.onLocationChanged(() => {});
 
+    api.onBookmarksUpdated(() => {
+      api.getActiveBookId().then((aid) => {
+        if (!aid) return;
+        api.getBooks().then((bks) => {
+          const active = (bks || []).find((b) => b.id === aid);
+          if (active) {
+            api.getBookmarks(active.filePath).then((bm) => setBookmarks(bm || []));
+          }
+        });
+      });
+    });
+
     api.getStyle().then((s) => { if (s) setStyle(s); });
     api.storeGet('mainTheme').then((t) => { if (t) setTheme(t); });
 
     return () => {
       api.removeAllListeners('progress-update');
       api.removeAllListeners('location-changed');
+      api.removeAllListeners('bookmarks-updated');
     };
   }, []);
 

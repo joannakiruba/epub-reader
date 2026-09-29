@@ -256,16 +256,33 @@ export default function App() {
   const handleNext = () => renditionRef.current?.next();
   const handleHide = () => api?.hideWidget();
 
-  const handleDragStart = (e) => {
+  const titlebarRef = useRef(null);
+
+  const handleDragPointerDown = (e) => {
     if (e.target.closest('.widget-nav')) return;
+    if (e.button !== 0) return;
     e.preventDefault();
+    e.stopPropagation();
+
+    const el = titlebarRef.current;
+    if (!el) return;
+    el.setPointerCapture(e.pointerId);
+
     api?.startDrag(e.screenX, e.screenY);
 
-    const onUp = () => {
+    const onPointerUp = (ev) => {
       api?.stopDrag();
-      window.removeEventListener('mouseup', onUp, true);
+      el.releasePointerCapture(ev.pointerId);
+      el.removeEventListener('pointerup', onPointerUp);
+      el.removeEventListener('lostpointercapture', onLost);
     };
-    window.addEventListener('mouseup', onUp, true);
+    const onLost = () => {
+      api?.stopDrag();
+      el.removeEventListener('pointerup', onPointerUp);
+      el.removeEventListener('lostpointercapture', onLost);
+    };
+    el.addEventListener('pointerup', onPointerUp);
+    el.addEventListener('lostpointercapture', onLost);
   };
 
   const textureMap = {
@@ -286,7 +303,7 @@ export default function App() {
 
   return (
     <div className="widget" style={bgStyle}>
-      <div className="widget-titlebar" onMouseDown={handleDragStart}>
+      <div className="widget-titlebar" ref={titlebarRef} onPointerDown={handleDragPointerDown} style={{ touchAction: 'none' }}>
         <span className="widget-drag-hint" style={{ color: controlColor }}>&#x2807;</span>
         <div className="widget-nav">
           <button onClick={handlePrev} title="Previous" style={btnStyle}>&#x2190;</button>

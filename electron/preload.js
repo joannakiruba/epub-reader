@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openEpub: () => ipcRenderer.invoke('open-epub'),
   loadEpub: (filePath) => ipcRenderer.invoke('load-epub', filePath),
   getCurrentBook: () => ipcRenderer.invoke('get-current-book'),
+  readEpubFile: (filePath) => ipcRenderer.invoke('read-epub-file', filePath),
   saveBookProgress: (data) => ipcRenderer.invoke('save-book-progress', data),
 
   startDrag: (x, y) => ipcRenderer.send('widget-start-drag', x, y),

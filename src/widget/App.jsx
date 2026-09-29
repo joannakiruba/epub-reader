@@ -132,6 +132,17 @@ export default function App() {
       loadBook(data.base64);
     });
 
+    api.getCurrentBook().then((book) => {
+      if (book && book.filePath) {
+        api.readEpubFile(book.filePath).then((base64) => {
+          if (base64) {
+            currentBookIdRef.current = book.filePath;
+            loadBook(base64);
+          }
+        });
+      }
+    });
+
     api.onStyleUpdate((s) => {
       setStyle(s);
       if (renditionRef.current) {

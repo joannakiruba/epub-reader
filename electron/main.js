@@ -129,6 +129,12 @@ function setupIPC() {
     return { base64, fileName, filePath };
   });
 
+  ipcMain.handle('read-epub-file', async (_, filePath) => {
+    if (!filePath || !fs.existsSync(filePath)) return null;
+    const fileData = fs.readFileSync(filePath);
+    return fileData.toString('base64');
+  });
+
   ipcMain.handle('get-current-book', async () => {
     return store.get('currentBook', null);
   });

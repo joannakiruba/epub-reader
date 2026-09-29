@@ -27,6 +27,7 @@ export default function App() {
     backgroundColor: '#fffff0',
     backgroundTexture: null,
     opacity: 1.0,
+    lineHeight: 1.6,
   });
 
   styleRef.current = style;
@@ -36,17 +37,20 @@ export default function App() {
 
   const applyStyle = useCallback((rendition, s) => {
     if (!rendition) return;
+    const lh = (s.lineHeight || 1.6) + ' !important';
     rendition.themes.default({
       body: {
         'font-family': s.fontFamily + ' !important',
         'font-size': s.fontSize + 'px !important',
         color: s.fontColor + ' !important',
         background: 'transparent !important',
+        'line-height': lh,
       },
       p: {
         'font-family': s.fontFamily + ' !important',
         'font-size': s.fontSize + 'px !important',
         color: s.fontColor + ' !important',
+        'line-height': lh,
       },
     });
   }, []);

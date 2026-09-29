@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   BookOpen, Upload, Play, Eye, EyeOff, Bookmark, Trash2,
   Type, Palette, SlidersHorizontal, Sun, Moon,
-  ChevronRight, Sparkles, CircleDot,
+  ChevronRight, Sparkles, CircleDot, AlignJustify,
 } from 'lucide-react';
 import './App.css';
 
@@ -21,6 +21,7 @@ export default function App() {
     backgroundColor: '#fffff0',
     backgroundTexture: null,
     opacity: 1.0,
+    lineHeight: 1.6,
   });
 
   const refreshBooks = useCallback(async () => {
@@ -314,6 +315,7 @@ export default function App() {
                 <option value="'Courier New', monospace">Courier New</option>
                 <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
                 <option value="Palatino, serif">Palatino</option>
+                <option value="'Lucida Grande', sans-serif">Lucida Grande</option>
               </select>
             </label>
 
@@ -322,6 +324,13 @@ export default function App() {
               <input type="range" className="slider" min="10" max="32"
                 value={style.fontSize}
                 onChange={(e) => handleStyleChange('fontSize', parseInt(e.target.value))} />
+            </label>
+
+            <label className="opt-row">
+              <span className="opt-label"><AlignJustify size={14} strokeWidth={1.5} /> Line Spacing <em>{style.lineHeight || 1.6}</em></span>
+              <input type="range" className="slider" min="10" max="30" step="1"
+                value={Math.round((style.lineHeight || 1.6) * 10)}
+                onChange={(e) => handleStyleChange('lineHeight', parseInt(e.target.value) / 10)} />
             </label>
 
             <label className="opt-row">

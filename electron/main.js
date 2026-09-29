@@ -373,6 +373,7 @@ const defaultStyle = {
   backgroundColor: '#fffff0',
   backgroundTexture: null,
   opacity: 1.0,
+  lineHeight: 1.6,
 };
 
 let store;

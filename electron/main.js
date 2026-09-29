@@ -154,6 +154,7 @@ function setupIPC() {
     if (!widgetWindow) return;
     const [winX, winY] = widgetWindow.getPosition();
     dragOffset = { x: screenX - winX, y: screenY - winY };
+    widgetWindow.setResizable(false);
   });
 
   ipcMain.on('widget-dragging', (_, screenX, screenY) => {
@@ -166,6 +167,9 @@ function setupIPC() {
 
   ipcMain.on('widget-stop-drag', () => {
     dragOffset = null;
+    if (widgetWindow) {
+      widgetWindow.setResizable(true);
+    }
   });
 
   ipcMain.on('widget-show', () => {

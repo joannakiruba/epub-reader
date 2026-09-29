@@ -18,6 +18,7 @@ export default function App() {
   const bookRef = useRef(null);
   const currentCfiRef = useRef(null);
   const currentBookIdRef = useRef(null);
+  const styleRef = useRef(null);
   const [hasBook, setHasBook] = useState(false);
   const [style, setStyle] = useState({
     fontFamily: 'Georgia, serif',
@@ -27,6 +28,8 @@ export default function App() {
     backgroundTexture: null,
     opacity: 1.0,
   });
+
+  styleRef.current = style;
 
   const isDark = useMemo(() => hexToLuminance(style.backgroundColor) < 0.4, [style.backgroundColor]);
   const controlColor = isDark ? '#ffffff' : '#000000';
@@ -76,7 +79,7 @@ export default function App() {
       });
 
       renditionRef.current = rendition;
-      applyStyle(rendition, style);
+      applyStyle(rendition, styleRef.current);
 
       rendition.on('relocated', (location) => {
         const cfi = location.start.cfi;
@@ -117,7 +120,7 @@ export default function App() {
         }
       });
     },
-    [style, applyStyle]
+    [applyStyle]
   );
 
   useEffect(() => {
@@ -127,42 +130,31 @@ export default function App() {
       if (s) setStyle(s);
     });
 
-    api.onEpubOpened((data) => {
+    const handleEpubOpened = (data) => {
       currentBookIdRef.current = data.filePath;
       loadBook(data.base64);
-    });
+    };
 
-    api.getCurrentBook().then((book) => {
-      if (book && book.filePath) {
-        api.readEpubFile(book.filePath).then((base64) => {
-          if (base64) {
-            currentBookIdRef.current = book.filePath;
-            loadBook(base64);
-          }
-        });
-      }
-    });
-
-    api.onStyleUpdate((s) => {
+    const handleStyleUpdate = (s) => {
       setStyle(s);
       if (renditionRef.current) {
         applyStyle(renditionRef.current, s);
       }
-    });
+    };
 
-    api.onNavigate((direction) => {
+    const handleNavigate = (direction) => {
       if (!renditionRef.current) return;
       if (direction === 'next') renditionRef.current.next();
       else if (direction === 'prev') renditionRef.current.prev();
-    });
+    };
 
-    api.onBookmarkGoto((cfi) => {
+    const handleBookmarkGoto = (cfi) => {
       if (renditionRef.current) {
         renditionRef.current.display(cfi);
       }
-    });
+    };
 
-    api.onQuickBookmark(async () => {
+    const handleQuickBookmark = async () => {
       const cfi = currentCfiRef.current;
       const bookId = currentBookIdRef.current;
       if (!cfi || !bookId) return;
@@ -197,6 +189,23 @@ export default function App() {
         note: null,
         createdAt: new Date().toISOString(),
       });
+    };
+
+    api.onEpubOpened(handleEpubOpened);
+    api.onStyleUpdate(handleStyleUpdate);
+    api.onNavigate(handleNavigate);
+    api.onBookmarkGoto(handleBookmarkGoto);
+    api.onQuickBookmark(handleQuickBookmark);
+
+    api.getCurrentBook().then((book) => {
+      if (book && book.filePath) {
+        api.readEpubFile(book.filePath).then((base64) => {
+          if (base64) {
+            currentBookIdRef.current = book.filePath;
+            loadBook(base64);
+          }
+        });
+      }
     });
 
     return () => {
@@ -216,17 +225,21 @@ export default function App() {
     if (e.target.closest('.widget-nav')) return;
     e.preventDefault();
     api?.startDrag(e.screenX, e.screenY);
+    api?.storeSet('widgetDragging', true);
 
     const onMove = (ev) => {
+      ev.preventDefault();
       api?.dragging(ev.screenX, ev.screenY);
     };
-    const onUp = () => {
+    const onUp = (ev) => {
+      ev.preventDefault();
       api?.stopDrag();
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      api?.storeSet('widgetDragging', false);
+      window.removeEventListener('mousemove', onMove, true);
+      window.removeEventListener('mouseup', onUp, true);
     };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    window.addEventListener('mousemove', onMove, true);
+    window.addEventListener('mouseup', onUp, true);
   };
 
   const textureMap = {
@@ -243,9 +256,7 @@ export default function App() {
     color: controlColor,
   };
 
-  const btnStyle = {
-    color: controlColor,
-  };
+  const btnStyle = { color: controlColor };
 
   return (
     <div className="widget" style={bgStyle}>

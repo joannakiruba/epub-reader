@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   BookOpen, Upload, Play, Eye, EyeOff, Bookmark, Trash2,
-  Type, Palette, SlidersHorizontal, Sun, Moon, Keyboard,
+  Type, Palette, SlidersHorizontal, Sun, Moon,
   ChevronRight, Sparkles, CircleDot,
 } from 'lucide-react';
 import './App.css';
@@ -9,8 +9,9 @@ import './App.css';
 const api = window.electronAPI;
 
 export default function App() {
-  const [currentBook, setCurrentBook] = useState(null);
-  const [progress, setProgress] = useState(0);
+  const [books, setBooks] = useState([]);
+  const [activeBookId, setActiveBookId] = useState(null);
+  const [progressMap, setProgressMap] = useState({});
   const [bookmarks, setBookmarks] = useState([]);
   const [theme, setTheme] = useState('dark');
   const [style, setStyle] = useState({
@@ -22,21 +23,41 @@ export default function App() {
     opacity: 1.0,
   });
 
+  const refreshBooks = useCallback(async () => {
+    if (!api) return;
+    const list = await api.getBooks();
+    setBooks(list || []);
+    const aid = await api.getActiveBookId();
+    setActiveBookId(aid);
+
+    const pm = {};
+    for (const b of (list || [])) {
+      pm[b.id] = b.progress || 0;
+    }
+    setProgressMap(pm);
+  }, []);
+
   useEffect(() => {
     if (!api) return;
 
-    api.onProgressUpdate((data) => setProgress(data.progress));
-    api.onLocationChanged((data) =>
-      setCurrentBook((prev) => (prev ? { ...prev, lastReadCfi: data.cfi } : prev))
-    );
-    api.getStyle().then((s) => { if (s) setStyle(s); });
-    api.getCurrentBook().then((book) => {
-      if (book) {
-        setCurrentBook(book);
-        setProgress(book.progress || 0);
-        loadBookmarks(book.filePath);
-      }
+    refreshBooks();
+
+    api.onProgressUpdate((data) => {
+      setProgressMap((prev) => {
+        const updated = { ...prev };
+        for (const b of books) {
+          if (b.filePath) {
+            updated[b.id] = data.progress;
+          }
+        }
+        return updated;
+      });
+      refreshBooks();
     });
+
+    api.onLocationChanged(() => {});
+
+    api.getStyle().then((s) => { if (s) setStyle(s); });
     api.storeGet('mainTheme').then((t) => { if (t) setTheme(t); });
 
     return () => {
@@ -44,6 +65,14 @@ export default function App() {
       api.removeAllListeners('location-changed');
     };
   }, []);
+
+  useEffect(() => {
+    if (!api || !activeBookId) return;
+    const active = books.find((b) => b.id === activeBookId);
+    if (active) {
+      loadBookmarks(active.filePath);
+    }
+  }, [activeBookId, books]);
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -55,22 +84,41 @@ export default function App() {
     if (!api) return;
     const result = await api.openEpub();
     if (result) {
-      setCurrentBook(result);
-      setProgress(result.progress || 0);
-      loadBookmarks(result.filePath);
+      setBooks(result.books || []);
+      setActiveBookId(result.activeBookId);
+      refreshBooks();
     }
   };
 
-  const handleContinueReading = async () => {
-    if (!currentBook || !api) return;
-    await api.loadEpub(currentBook.filePath);
+  const handleActivateBook = async (bookId) => {
+    if (!api) return;
+    await api.activateBook(bookId);
+    setActiveBookId(bookId);
+    refreshBooks();
+  };
+
+  const handleRemoveBook = async (bookId) => {
+    if (!api) return;
+    const updated = await api.removeBook(bookId);
+    setBooks(updated || []);
+    if (activeBookId === bookId) {
+      const newActive = updated && updated.length > 0 ? updated[0].id : null;
+      setActiveBookId(newActive);
+    }
+    refreshBooks();
+  };
+
+  const handleContinueReading = async (book) => {
+    if (!book || !api) return;
+    await api.activateBook(book.id);
+    setActiveBookId(book.id);
     api.showWidget();
   };
 
   const loadBookmarks = async (bookId) => {
     if (!api) return;
     const bm = await api.getBookmarks(bookId);
-    setBookmarks(bm);
+    setBookmarks(bm || []);
   };
 
   const handleStyleChange = (key, value) => {
@@ -91,12 +139,13 @@ export default function App() {
     setBookmarks(updated);
   };
 
+  const activeBook = books.find((b) => b.id === activeBookId);
+
   return (
     <div className={`app theme-${theme}`} data-theme={theme}>
       <div className="bg-noise" />
 
       <div className="app-shell">
-        {/* ── Header ── */}
         <header className="topbar">
           <div className="topbar-brand">
             <div className="brand-icon">
@@ -117,6 +166,7 @@ export default function App() {
           <div className="card-head">
             <div className="card-head-icon"><Sparkles size={16} strokeWidth={1.5} /></div>
             <h2>Library</h2>
+            {books.length > 0 && <span className="badge">{books.length}</span>}
           </div>
 
           <button className="action-btn" onClick={handleOpenEpub}>
@@ -125,37 +175,53 @@ export default function App() {
             <ChevronRight size={16} className="action-arrow" />
           </button>
 
-          {currentBook && (
-            <div className="book-tile">
-              <div className="book-tile-top">
-                <div className="book-tile-icon">
-                  <BookOpen size={24} strokeWidth={1.2} />
-                </div>
-                <div className="book-tile-info">
-                  <h3>{currentBook.fileName}</h3>
-                  <div className="prog-row">
-                    <div className="prog-track">
-                      <div className="prog-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
-                      <div className="prog-glow" style={{ left: `${Math.round(progress * 100)}%` }} />
-                    </div>
-                    <span className="prog-pct">{Math.round(progress * 100)}%</span>
-                  </div>
-                </div>
-              </div>
-              <div className="book-tile-actions">
-                <button className="pill-btn pill-primary" onClick={handleContinueReading}>
-                  <Play size={14} strokeWidth={2} />
-                  <span>Continue</span>
-                </button>
-                <button className="icon-btn" onClick={() => api?.showWidget()} title="Show widget">
-                  <Eye size={16} strokeWidth={1.5} />
-                </button>
-                <button className="icon-btn" onClick={() => api?.hideWidget()} title="Hide widget">
-                  <EyeOff size={16} strokeWidth={1.5} />
-                </button>
-              </div>
+          {books.length === 0 && (
+            <div className="empty" style={{ paddingTop: 16 }}>
+              <p>No books in library</p>
             </div>
           )}
+
+          {books.map((book) => {
+            const prog = progressMap[book.id] || book.progress || 0;
+            const isActive = book.id === activeBookId;
+            return (
+              <div key={book.id} className={`book-tile ${isActive ? 'book-tile-active' : ''}`}>
+                <div className="book-tile-top">
+                  <div className="book-tile-icon">
+                    <BookOpen size={24} strokeWidth={1.2} />
+                  </div>
+                  <div className="book-tile-info">
+                    <h3>{book.fileName}</h3>
+                    <div className="prog-row">
+                      <div className="prog-track">
+                        <div className="prog-fill" style={{ width: `${Math.round(prog * 100)}%` }} />
+                        <div className="prog-glow" style={{ left: `${Math.round(prog * 100)}%` }} />
+                      </div>
+                      <span className="prog-pct">{Math.round(prog * 100)}%</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="book-tile-actions">
+                  <button className="pill-btn pill-primary" onClick={() => handleContinueReading(book)}>
+                    <Play size={14} strokeWidth={2} />
+                    <span>Continue</span>
+                  </button>
+                  {!isActive && (
+                    <button className="icon-btn" onClick={() => handleActivateBook(book.id)} title="Set active">
+                      <Eye size={16} strokeWidth={1.5} />
+                    </button>
+                  )}
+                  <button
+                    className="icon-btn icon-btn-danger"
+                    onClick={() => handleRemoveBook(book.id)}
+                    title="Remove from library"
+                  >
+                    <Trash2 size={14} strokeWidth={1.5} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </section>
 
         {/* ── Bookmarks ── */}
@@ -163,6 +229,7 @@ export default function App() {
           <div className="card-head">
             <div className="card-head-icon"><Bookmark size={16} strokeWidth={1.5} /></div>
             <h2>Bookmarks</h2>
+            {activeBook && <span className="badge">{activeBook.fileName}</span>}
             {bookmarks.length > 0 && <span className="badge">{bookmarks.length}</span>}
           </div>
 
@@ -267,7 +334,6 @@ export default function App() {
           </div>
         </section>
 
-        {/* ── Footer ── */}
         <footer className="foot">
           <kbd>Ctrl+Shift+R</kbd> <span>toggle widget</span>
           <span className="foot-sep" />

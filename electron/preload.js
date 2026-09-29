@@ -7,6 +7,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readEpubFile: (filePath) => ipcRenderer.invoke('read-epub-file', filePath),
   saveBookProgress: (data) => ipcRenderer.invoke('save-book-progress', data),
 
+  getBooks: () => ipcRenderer.invoke('get-books'),
+  getActiveBookId: () => ipcRenderer.invoke('get-active-book-id'),
+  activateBook: (bookId) => ipcRenderer.invoke('activate-book', bookId),
+  removeBook: (bookId) => ipcRenderer.invoke('remove-book', bookId),
+
   startDrag: (x, y) => ipcRenderer.send('widget-start-drag', x, y),
   dragging: (x, y) => ipcRenderer.send('widget-dragging', x, y),
   stopDrag: () => ipcRenderer.send('widget-stop-drag'),

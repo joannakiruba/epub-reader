@@ -372,6 +372,11 @@ body {
   text-align: right;
 }
 
+.book-tile-active {
+  border-color: var(--glass-shine);
+  background: var(--surface-hover);
+}
+
 .book-tile-actions {
   display: flex;
   align-items: center;
@@ -574,6 +579,22 @@ body {
 
 .sel:hover { border-color: var(--glass-shine); }
 .sel:focus { outline: none; border-color: var(--text-2); }
+
+.sel option {
+  background: var(--canvas);
+  color: var(--text-1);
+  padding: 6px;
+}
+
+.theme-dark .sel option {
+  background: #18181b;
+  color: #fafafa;
+}
+
+.theme-light .sel option {
+  background: #ffffff;
+  color: #09090b;
+}
 
 .slider {
   -webkit-appearance: none;

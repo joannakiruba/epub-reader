@@ -225,20 +225,11 @@ export default function App() {
     if (e.target.closest('.widget-nav')) return;
     e.preventDefault();
     api?.startDrag(e.screenX, e.screenY);
-    api?.storeSet('widgetDragging', true);
 
-    const onMove = (ev) => {
-      ev.preventDefault();
-      api?.dragging(ev.screenX, ev.screenY);
-    };
-    const onUp = (ev) => {
-      ev.preventDefault();
+    const onUp = () => {
       api?.stopDrag();
-      api?.storeSet('widgetDragging', false);
-      window.removeEventListener('mousemove', onMove, true);
       window.removeEventListener('mouseup', onUp, true);
     };
-    window.addEventListener('mousemove', onMove, true);
     window.addEventListener('mouseup', onUp, true);
   };
 

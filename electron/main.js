@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, globalShortcut, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { setupTray } = require('./tray');
@@ -12,8 +12,8 @@ const preloadPath = path.join(__dirname, 'preload.js');
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 700,
+    width: 1000,
+    height: 720,
     title: 'Epub Reader',
     webPreferences: {
       preload: preloadPath,
@@ -90,29 +90,110 @@ function createWidgetWindow() {
   widgetWindow.hide();
 }
 
+function getBooks() {
+  return store.get('books', []);
+}
+
+function saveBooks(books) {
+  store.set('books', books);
+}
+
+function findBook(filePath) {
+  return getBooks().find((b) => b.filePath === filePath);
+}
+
+function upsertBook(filePath, fileName) {
+  let books = getBooks();
+  let book = books.find((b) => b.filePath === filePath);
+  if (!book) {
+    book = { id: Date.now().toString(), fileName, filePath, progress: 0, lastReadCfi: null };
+    books.push(book);
+    saveBooks(books);
+  }
+  store.set('activeBookId', book.id);
+  return book;
+}
+
 function setupIPC() {
+  // ── Book management ──
   ipcMain.handle('open-epub', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openFile'],
+      properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'EPUB Files', extensions: ['epub'] }],
     });
 
     if (result.canceled || result.filePaths.length === 0) return null;
 
-    const filePath = result.filePaths[0];
-    const fileData = fs.readFileSync(filePath);
-    const base64 = fileData.toString('base64');
-    const fileName = path.basename(filePath);
+    const opened = [];
+    for (const filePath of result.filePaths) {
+      const fileName = path.basename(filePath);
+      const book = upsertBook(filePath, fileName);
+      opened.push(book);
+    }
 
-    const bookInfo = { fileName, filePath, progress: 0, lastReadCfi: null };
-    store.set('currentBook', bookInfo);
+    const last = opened[opened.length - 1];
+    const fileData = fs.readFileSync(last.filePath);
+    const base64 = fileData.toString('base64');
 
     if (widgetWindow) {
-      widgetWindow.webContents.send('epub-opened', { base64, fileName, filePath });
+      widgetWindow.webContents.send('epub-opened', {
+        base64,
+        fileName: last.fileName,
+        filePath: last.filePath,
+      });
       widgetWindow.show();
     }
 
-    return bookInfo;
+    return { books: getBooks(), activeBookId: last.id };
+  });
+
+  ipcMain.handle('get-books', async () => {
+    return getBooks();
+  });
+
+  ipcMain.handle('get-active-book-id', async () => {
+    return store.get('activeBookId', null);
+  });
+
+  ipcMain.handle('activate-book', async (_, bookId) => {
+    const books = getBooks();
+    const book = books.find((b) => b.id === bookId);
+    if (!book || !fs.existsSync(book.filePath)) return null;
+
+    store.set('activeBookId', bookId);
+    const fileData = fs.readFileSync(book.filePath);
+    const base64 = fileData.toString('base64');
+
+    if (widgetWindow) {
+      widgetWindow.webContents.send('epub-opened', {
+        base64,
+        fileName: book.fileName,
+        filePath: book.filePath,
+      });
+      widgetWindow.show();
+    }
+
+    return book;
+  });
+
+  ipcMain.handle('remove-book', async (_, bookId) => {
+    let books = getBooks();
+    const removedBook = books.find((b) => b.id === bookId);
+    books = books.filter((b) => b.id !== bookId);
+    saveBooks(books);
+
+    if (removedBook) {
+      let bookmarks = store.get('bookmarks', []);
+      bookmarks = bookmarks.filter((bm) => bm.bookId !== removedBook.filePath);
+      store.set('bookmarks', bookmarks);
+    }
+
+    const activeId = store.get('activeBookId');
+    if (activeId === bookId) {
+      store.set('activeBookId', books.length > 0 ? books[0].id : null);
+    }
+
+    return books;
   });
 
   ipcMain.handle('load-epub', async (_, filePath) => {
@@ -136,42 +217,59 @@ function setupIPC() {
   });
 
   ipcMain.handle('get-current-book', async () => {
-    return store.get('currentBook', null);
+    const activeId = store.get('activeBookId');
+    if (!activeId) return null;
+    const books = getBooks();
+    return books.find((b) => b.id === activeId) || null;
   });
 
   ipcMain.handle('save-book-progress', async (_, { filePath, cfi, progress }) => {
-    const current = store.get('currentBook');
-    if (current && current.filePath === filePath) {
-      current.lastReadCfi = cfi;
-      current.progress = progress;
-      store.set('currentBook', current);
+    let books = getBooks();
+    const idx = books.findIndex((b) => b.filePath === filePath);
+    if (idx !== -1) {
+      books[idx].lastReadCfi = cfi;
+      books[idx].progress = progress;
+      saveBooks(books);
     }
   });
 
+  // ── Drag: poll cursor in main process so it never loses track ──
   let dragOffset = null;
+  let dragInterval = null;
 
   ipcMain.on('widget-start-drag', (_, screenX, screenY) => {
     if (!widgetWindow) return;
     const [winX, winY] = widgetWindow.getPosition();
     dragOffset = { x: screenX - winX, y: screenY - winY };
     widgetWindow.setResizable(false);
+
+    if (dragInterval) clearInterval(dragInterval);
+    dragInterval = setInterval(() => {
+      if (!widgetWindow || !dragOffset) {
+        clearInterval(dragInterval);
+        dragInterval = null;
+        return;
+      }
+      const cursor = screen.getCursorScreenPoint();
+      widgetWindow.setPosition(
+        Math.round(cursor.x - dragOffset.x),
+        Math.round(cursor.y - dragOffset.y)
+      );
+    }, 16);
   });
 
-  ipcMain.on('widget-dragging', (_, screenX, screenY) => {
-    if (!widgetWindow || !dragOffset) return;
-    widgetWindow.setPosition(
-      Math.round(screenX - dragOffset.x),
-      Math.round(screenY - dragOffset.y)
-    );
-  });
+  ipcMain.on('widget-dragging', () => {});
 
   ipcMain.on('widget-stop-drag', () => {
-    dragOffset = null;
-    if (widgetWindow) {
-      widgetWindow.setResizable(true);
+    if (dragInterval) {
+      clearInterval(dragInterval);
+      dragInterval = null;
     }
+    dragOffset = null;
+    if (widgetWindow) widgetWindow.setResizable(true);
   });
 
+  // ── Widget visibility ──
   ipcMain.on('widget-show', () => {
     if (widgetWindow) widgetWindow.show();
   });
@@ -189,34 +287,28 @@ function setupIPC() {
     }
   });
 
+  // ── Forwarding ──
   ipcMain.on('navigate', (_, direction) => {
-    if (widgetWindow) {
-      widgetWindow.webContents.send('navigate', direction);
-    }
+    if (widgetWindow) widgetWindow.webContents.send('navigate', direction);
   });
 
   ipcMain.on('location-changed', (_, data) => {
-    if (mainWindow) {
-      mainWindow.webContents.send('location-changed', data);
-    }
+    if (mainWindow) mainWindow.webContents.send('location-changed', data);
   });
 
   ipcMain.on('progress-update', (_, data) => {
-    if (mainWindow) {
-      mainWindow.webContents.send('progress-update', data);
-    }
+    if (mainWindow) mainWindow.webContents.send('progress-update', data);
   });
 
   ipcMain.on('style-update', (_, style) => {
-    if (widgetWindow) {
-      widgetWindow.webContents.send('style-update', style);
-    }
+    if (widgetWindow) widgetWindow.webContents.send('style-update', style);
   });
 
   ipcMain.handle('get-style', async () => {
     return store.get('style', defaultStyle);
   });
 
+  // ── Bookmarks ──
   ipcMain.handle('bookmark-add', async (_, bookmark) => {
     const bookmarks = store.get('bookmarks', []);
     bookmarks.push(bookmark);
@@ -238,11 +330,10 @@ function setupIPC() {
   });
 
   ipcMain.on('bookmark-goto', (_, cfi) => {
-    if (widgetWindow) {
-      widgetWindow.webContents.send('bookmark-goto', cfi);
-    }
+    if (widgetWindow) widgetWindow.webContents.send('bookmark-goto', cfi);
   });
 
+  // ── Generic store ──
   ipcMain.handle('store-get', async (_, key) => {
     return store.get(key);
   });
@@ -270,6 +361,7 @@ app.whenReady().then(async () => {
       style: defaultStyle,
       bookmarks: [],
       books: [],
+      activeBookId: null,
       widgetState: { x: 100, y: 100, width: 400, height: 300, visible: false },
     },
   });

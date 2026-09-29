@@ -176,8 +176,18 @@ export default function App() {
 
     const handleNavigate = (direction) => {
       if (!renditionRef.current) return;
-      if (direction === 'next') renditionRef.current.next();
-      else if (direction === 'prev') renditionRef.current.prev();
+      if (direction === 'next') {
+        renditionRef.current.next();
+      } else if (direction === 'prev') {
+        const book = bookRef.current;
+        const loc = renditionRef.current.currentLocation();
+        if (book && loc && loc.start) {
+          const section = book.spine.get(loc.start.href);
+          const prev = section?.prev();
+          if (prev) { renditionRef.current.display(prev.href); return; }
+        }
+        renditionRef.current.prev();
+      }
     };
 
     const handleBookmarkGoto = (cfi) => {
@@ -249,7 +259,23 @@ export default function App() {
     };
   }, [loadBook, applyStyle]);
 
-  const handlePrev = () => renditionRef.current?.prev();
+  const handlePrev = () => {
+    const rendition = renditionRef.current;
+    const book = bookRef.current;
+    if (!rendition || !book) return;
+
+    const loc = rendition.currentLocation();
+    if (!loc || !loc.start) { rendition.prev(); return; }
+
+    const currentSection = book.spine.get(loc.start.href);
+    if (!currentSection) { rendition.prev(); return; }
+
+    const prevSection = currentSection.prev();
+    if (prevSection) {
+      rendition.display(prevSection.href);
+    }
+  };
+
   const handleNext = () => renditionRef.current?.next();
   const handleHide = () => api?.hideWidget();
 
